@@ -226,7 +226,7 @@ def draw_visualization():
         ax.set_xlim(0, 600)
         ax.set_ylim(0, 400)
     
-    ax.set_title("K-means Clustering Visualization")
+    ax.set_title("K-means Clustering Visualisation")
     ax.set_xlabel("X")
     ax.set_ylabel("Y")
     ax.grid(alpha=0.3)
@@ -235,7 +235,7 @@ def draw_visualization():
     return fig
 
 # Create tabs for different modes
-tab1, tab2 = st.tabs(["Data Input", "Clustering Visualization"])
+tab1, tab2 = st.tabs(["Data Input", "Clustering Visualisation"])
 
 # Tab 1: Data Input
 with tab1:
@@ -383,7 +383,7 @@ with tab2:
     
     # Left column - visualization
     with col1:
-        st.subheader("K-means Clustering Visualization")
+        st.subheader("K-means Clustering Visualisation")
         
         # Create a placeholder for the matplotlib figure
         fig_placeholder = st.empty()
