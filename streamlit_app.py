@@ -4,13 +4,12 @@ import pandas as pd
 import matplotlib.pyplot as plt
 from sklearn.cluster import KMeans
 import time
-import io
 
 # Set page title and configuration
-st.set_page_config(page_title="K-means Clustering - Machine Learning in Action", layout="wide")
+st.set_page_config(page_title="K-means Clustering Demo", layout="wide")
 st.title("K-means Clustering - Machine Learning in Action")
 
-# Initialize session state variables if they don't exist
+# Make sure to initialize session state variables
 if 'data' not in st.session_state:
     st.session_state.data = np.array([])
 if 'k' not in st.session_state:
@@ -30,7 +29,9 @@ if 'is_running' not in st.session_state:
 if 'animation_speed' not in st.session_state:
     st.session_state.animation_speed = 0.5  # seconds
 if 'df' not in st.session_state:
-    st.session_state.df = pd.DataFrame()
+    st.session_state.df = pd.DataFrame({'X': [], 'Y': []})
+if 'active_tab' not in st.session_state:
+    st.session_state.active_tab = "Data Input"
 
 # Function to generate random clustered data
 def generate_random_data():
@@ -60,16 +61,6 @@ def generate_random_data():
     st.session_state.current_iteration = 0
     st.session_state.inertia_history = []
 
-# Function to clear all data
-def clear_data():
-    st.session_state.data = np.array([])
-    st.session_state.df = pd.DataFrame()
-    st.session_state.centroids = np.array([])
-    st.session_state.labels = np.array([])
-    st.session_state.current_iteration = 0
-    st.session_state.inertia_history = []
-    st.session_state.is_running = False
-
 # Function to initialize centroids randomly
 def initialize_centroids():
     if len(st.session_state.data) == 0:
@@ -92,21 +83,8 @@ def initialize_centroids():
     st.session_state.current_iteration = 0
     
     # Calculate initial inertia
-    initial_inertia = calculate_inertia(st.session_state.data, st.session_state.labels, st.session_state.centroids)
+    initial_inertia = kmeans.inertia_
     st.session_state.inertia_history = [{"iteration": 0, "inertia": initial_inertia}]
-
-# Calculate inertia (sum of squared distances to centroids)
-def calculate_inertia(points, labels, centroids):
-    total_distance = 0
-    
-    for i in range(len(centroids)):
-        cluster_points = points[labels == i]
-        if len(cluster_points) > 0:
-            centroid = centroids[i]
-            distances = np.sum((cluster_points - centroid) ** 2, axis=1)
-            total_distance += np.sum(distances)
-    
-    return total_distance
 
 # Perform one iteration of k-means
 def run_iteration():
@@ -142,18 +120,6 @@ def run_iteration():
     })
     
     return changed
-
-# Function to update the dataframe with cluster assignments
-def update_df_with_clusters():
-    if len(st.session_state.data) > 0 and len(st.session_state.labels) > 0:
-        # Create a new dataframe with original data
-        df = pd.DataFrame(st.session_state.data, columns=['X', 'Y'])
-        
-        # Add cluster assignments
-        df['Cluster'] = st.session_state.labels
-        
-        # Update session state
-        st.session_state.df = df
 
 # Function to draw the current state
 def draw_visualization():
@@ -192,17 +158,6 @@ def draw_visualization():
                 label='Centroids'
             )
             
-            # Optional: draw lines from points to centroids
-            for i in range(len(st.session_state.data)):
-                point = st.session_state.data[i]
-                centroid = st.session_state.centroids[st.session_state.labels[i]]
-                ax.plot(
-                    [point[0], centroid[0]],
-                    [point[1], centroid[1]],
-                    color=colors[st.session_state.labels[i] % len(colors)],
-                    alpha=0.2
-                )
-            
             # Add legend
             ax.legend(loc='upper right')
         else:
@@ -215,18 +170,17 @@ def draw_visualization():
                 s=50
             )
     
-    # Set axis limits to match canvas size
-    padding = 50
+    # Set axis limits with padding
     if len(st.session_state.data) > 0:
-        x_min, y_min = np.min(st.session_state.data, axis=0) - padding
-        x_max, y_max = np.max(st.session_state.data, axis=0) + padding
+        x_min, y_min = np.min(st.session_state.data, axis=0) - 20
+        x_max, y_max = np.max(st.session_state.data, axis=0) + 20
         ax.set_xlim(x_min, x_max)
         ax.set_ylim(y_min, y_max)
     else:
         ax.set_xlim(0, 600)
         ax.set_ylim(0, 400)
     
-    ax.set_title("K-means Clustering Visualisation")
+    ax.set_title("K-means Clustering Visualization")
     ax.set_xlabel("X")
     ax.set_ylabel("Y")
     ax.grid(alpha=0.3)
@@ -234,16 +188,20 @@ def draw_visualization():
     fig.tight_layout()
     return fig
 
-# Create tabs for different modes
-tab1, tab2 = st.tabs(["Data Input", "Clustering Visualisation"])
+# Define tab selection function using radio buttons instead
+tab_selection = st.radio("Select Mode:", ["Data Input", "Clustering Visualization"], horizontal=True)
+st.session_state.active_tab = tab_selection
 
-# Tab 1: Data Input
-with tab1:
-    st.header("Input Data")
+# Divider
+st.markdown("---")
+
+# Display the selected tab
+if st.session_state.active_tab == "Data Input":
+    st.header("Data Input")
     
     # Option to upload CSV
     st.subheader("Option 1: Upload a CSV file")
-    uploaded_file = st.file_uploader("Choose a CSV file with two columns of numerical data", type=["csv"])
+    uploaded_file = st.file_uploader("Choose a CSV file with numerical data", type=["csv"])
     
     if uploaded_file is not None:
         try:
@@ -291,45 +249,14 @@ with tab1:
     # Option to generate random data
     st.subheader("Option 2: Generate random clustered data")
     
-    # Parameters for random data
-    random_col1, random_col2 = st.columns(2)
-    with random_col1:
-        random_k = st.slider("Number of clusters", 2, 6, 3)
-    with random_col2:
-        points_per_cluster = st.slider("Points per cluster", 10, 50, 20)
-    
     # Button to generate random data
     if st.button("Generate Random Data"):
-        st.session_state.k = random_k
-        
-        # Generate random data
-        num_clusters = random_k
-        spread = 50
-        new_data = []
-        
-        for i in range(num_clusters):
-            center_x = 100 + np.random.random() * 400
-            center_y = 100 + np.random.random() * 400
-            
-            for j in range(points_per_cluster):
-                offset_x = (np.random.random() - 0.5) * spread
-                offset_y = (np.random.random() - 0.5) * spread
-                new_data.append([center_x + offset_x, center_y + offset_y])
-        
-        # Update session state
-        st.session_state.data = np.array(new_data)
-        
-        # Also update the dataframe
-        df = pd.DataFrame(new_data, columns=['X', 'Y'])
-        st.session_state.df = df
-        
-        # Reset clustering
-        st.session_state.centroids = np.array([])
-        st.session_state.labels = np.array([])
-        st.session_state.current_iteration = 0
-        st.session_state.inertia_history = []
-        
+        generate_random_data()
         st.success("Random data generated successfully!")
+        
+        # Show a preview
+        st.write("Preview of generated data:")
+        st.dataframe(st.session_state.df.head())
     
     st.markdown("---")
     
@@ -362,28 +289,14 @@ with tab1:
                 st.session_state.inertia_history = []
                 
                 st.success("Data from table loaded successfully!")
-    
-    # Display current data summary
-    if not st.session_state.df.empty:
-        st.subheader("Current Dataset Summary")
-        st.write(f"Number of data points: {len(st.session_state.df)}")
-        
-        # Display statistics
-        st.write("Data statistics:")
-        st.dataframe(st.session_state.df.describe())
-        
-        # Show current data
-        st.write("Current data points:")
-        st.dataframe(st.session_state.df)
 
-# Tab 2: Clustering Visualization
-with tab2:
+elif st.session_state.active_tab == "Clustering Visualization":
     # Create two columns for the main content
-    col1, col2 = st.columns([2, 1])
+    viz_col, control_col = st.columns([2, 1])
     
     # Left column - visualization
-    with col1:
-        st.subheader("K-means Clustering Visualisation")
+    with viz_col:
+        st.subheader("K-means Clustering Visualization")
         
         # Create a placeholder for the matplotlib figure
         fig_placeholder = st.empty()
@@ -396,40 +309,39 @@ with tab2:
             fig_placeholder.info("No data available. Please go to the Data Input tab to add data.")
     
     # Right column - controls
-    with col2:
+    with control_col:
         st.subheader("Algorithm Controls")
         
         if len(st.session_state.data) == 0:
             st.warning("Please add data in the Data Input tab first.")
         else:
-            with st.expander("Parameters", expanded=True):
-                # K value (number of clusters)
-                st.session_state.k = st.slider(
-                    "Number of clusters (k)", 
-                    min_value=1, 
-                    max_value=10, 
-                    value=st.session_state.k,
-                    disabled=st.session_state.is_running
+            # K value (number of clusters)
+            st.session_state.k = st.slider(
+                "Number of clusters (k)", 
+                min_value=1, 
+                max_value=10, 
+                value=st.session_state.k,
+                disabled=st.session_state.is_running
+            )
+            
+            # Max iterations
+            st.session_state.max_iterations = st.number_input(
+                "Max iterations", 
+                min_value=1, 
+                max_value=50, 
+                value=st.session_state.max_iterations,
+                disabled=st.session_state.is_running
+            )
+            
+            # Animation speed control (only shown when running)
+            if st.session_state.is_running:
+                st.session_state.animation_speed = st.slider(
+                    "Animation speed (seconds)", 
+                    min_value=0.1, 
+                    max_value=2.0, 
+                    value=st.session_state.animation_speed,
+                    step=0.1
                 )
-                
-                # Max iterations
-                st.session_state.max_iterations = st.number_input(
-                    "Max iterations", 
-                    min_value=1, 
-                    max_value=50, 
-                    value=st.session_state.max_iterations,
-                    disabled=st.session_state.is_running
-                )
-                
-                # Animation speed control (only shown when running)
-                if st.session_state.is_running:
-                    st.session_state.animation_speed = st.slider(
-                        "Animation speed (seconds)", 
-                        min_value=0.1, 
-                        max_value=2.0, 
-                        value=st.session_state.animation_speed,
-                        step=0.1
-                    )
             
             # Control buttons based on current state
             if st.session_state.is_running:
@@ -437,20 +349,18 @@ with tab2:
                     st.session_state.is_running = False
                     st.rerun()
             else:
-                col1, col2 = st.columns(2)
+                btn_col1, btn_col2 = st.columns(2)
                 
-                with col1:
+                with btn_col1:
                     if st.button("Initialize", disabled=len(st.session_state.data) == 0):
                         initialize_centroids()
-                        update_df_with_clusters()
                         st.rerun()
                 
-                with col2:
+                with btn_col2:
                     step_disabled = (len(st.session_state.centroids) == 0 or 
                                   st.session_state.current_iteration >= st.session_state.max_iterations)
                     if st.button("Step", disabled=step_disabled):
                         run_iteration()
-                        update_df_with_clusters()
                         st.rerun()
                 
                 # Auto-run button
@@ -458,22 +368,6 @@ with tab2:
                     if st.button("Auto-run Algorithm", type="primary"):
                         st.session_state.is_running = True
                         st.rerun()
-            
-            # Data generation and clearing
-            col1, col2 = st.columns(2)
-            
-            with col1:
-                if st.button("Reset Clustering", disabled=st.session_state.is_running):
-                    st.session_state.centroids = np.array([])
-                    st.session_state.labels = np.array([])
-                    st.session_state.current_iteration = 0
-                    st.session_state.inertia_history = []
-                    st.rerun()
-            
-            with col2:
-                if st.button("Clear All Data", disabled=st.session_state.is_running):
-                    clear_data()
-                    st.rerun()
             
             # Status information
             st.subheader("Status")
@@ -484,67 +378,30 @@ with tab2:
                 current_inertia = st.session_state.inertia_history[-1]["inertia"]
                 st.write(f"Inertia: **{current_inertia:.2f}** (lower is better)")
     
-    # Display clustering results if available
-    if len(st.session_state.labels) > 0:
-        st.subheader("Clustering Results")
+    # Display learning progress chart if we have history data
+    if len(st.session_state.inertia_history) > 1:
+        st.subheader("Learning Progress")
         
-        # Count number of points per cluster
-        unique_labels, counts = np.unique(st.session_state.labels, return_counts=True)
-        cluster_counts = {f"Cluster {i+1}": count for i, count in zip(unique_labels, counts)}
+        # Convert history to DataFrame
+        history_df = pd.DataFrame(st.session_state.inertia_history)
         
-        # Display as columns
-        cols = st.columns(len(cluster_counts))
-        for i, (cluster, count) in enumerate(cluster_counts.items()):
-            with cols[i]:
-                st.metric(label=cluster, value=count)
+        # Display chart
+        st.line_chart(
+            history_df.set_index("iteration")["inertia"], 
+            use_container_width=True
+        )
         
-        # Display learning progress chart if we have history data
-        if len(st.session_state.inertia_history) > 1:
-            st.subheader("Learning Progress")
-            
-            # Convert history to DataFrame
-            history_df = pd.DataFrame(st.session_state.inertia_history)
-            
-            # Display chart
-            st.line_chart(
-                history_df.set_index("iteration")["inertia"], 
-                use_container_width=True
-            )
-            
-            st.caption(
-                "The chart shows how the algorithm improves with each iteration. "
-                "Lower inertia means better clustering."
-            )
-        
-        # Show clustered data table
-        if not st.session_state.df.empty:
-            st.subheader("Clustered Data")
-            
-            # Create a copy with cluster assignments
-            if 'Cluster' not in st.session_state.df.columns and len(st.session_state.labels) == len(st.session_state.df):
-                clustered_df = st.session_state.df.copy()
-                clustered_df['Cluster'] = st.session_state.labels
-            else:
-                clustered_df = st.session_state.df
-            
-            # Display the clustered data
-            st.dataframe(clustered_df, use_container_width=True)
-            
-            # Add a download button for the clustered data
-            csv = clustered_df.to_csv(index=False)
-            st.download_button(
-                label="Download Clustered Data as CSV",
-                data=csv,
-                file_name="clustered_data.csv",
-                mime="text/csv"
-            )
+        st.caption(
+            "The chart shows how the algorithm improves with each iteration. "
+            "Lower inertia means better clustering."
+        )
 
 # Educational section at the bottom of the page
 st.markdown("---")
 st.subheader("How K-means Clustering Works")
-col1, col2 = st.columns(2)
+edu_col1, edu_col2 = st.columns(2)
 
-with col1:
+with edu_col1:
     st.write("#### The Algorithm:")
     st.markdown("""
     1. Initialize k random cluster centers (centroids)
@@ -553,12 +410,11 @@ with col1:
     4. Repeat steps 2-3 until centroids no longer move significantly
     """)
 
-with col2:
+with edu_col2:
     st.write("#### What You're Seeing:")
     st.markdown("""
     - Points are coloured based on which cluster they belong to
     - X markers show the centroids (cluster centers)
-    - Lines connect points to their assigned centroid
     - The chart shows how error decreases with each iteration
     - K-means is **unsupervised** - it finds patterns without labels
     """)
@@ -581,7 +437,6 @@ if st.session_state.is_running:
     else:
         # Run one iteration
         changed = run_iteration()
-        update_df_with_clusters()
         
         # Update the visualization
         fig = draw_visualization()
